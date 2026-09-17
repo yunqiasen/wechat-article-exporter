@@ -1,3 +1,13 @@
+// Vercel Marketplace 连接 Upstash 后会自动注入 UPSTASH_REDIS_REST_*；无需再手填 driver。
+// 显式 NITRO_KV_DRIVER 始终优先，确保本地 fs / Cloudflare binding 原逻辑不变。
+const kvDriver =
+  process.env.NITRO_KV_DRIVER ||
+  (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? 'upstash'
+    : process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+      ? 'vercel-kv'
+      : 'memory');
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-10-30',
@@ -50,10 +60,24 @@ export default defineNuxtConfig({
     },
     storage: {
       kv: {
-        driver: process.env.NITRO_KV_DRIVER || 'memory',
+        driver: kvDriver,
         // cloudflare-kv-binding 驱动使用；Workers 部署时对应 wrangler.toml 中的 KV 绑定名。
         // fs / memory 驱动会忽略该选项，因此对 Docker / 本地 dev 无影响。
         binding: 'KV',
+        // Vercel Serverless 必须使用持久化存储；memory 驱动会因函数实例切换而丢失登录态、代理绑定与风控状态。
+        // 推荐在 Vercel Marketplace 添加 Upstash Redis，并设置 NITRO_KV_DRIVER=upstash。
+        url:
+          kvDriver === 'upstash'
+            ? process.env.UPSTASH_REDIS_REST_URL
+            : kvDriver === 'vercel-kv'
+              ? process.env.KV_REST_API_URL
+              : undefined,
+        token:
+          kvDriver === 'upstash'
+            ? process.env.UPSTASH_REDIS_REST_TOKEN
+            : kvDriver === 'vercel-kv'
+              ? process.env.KV_REST_API_TOKEN
+              : undefined,
         // base 对 fs 驱动是存储目录(.data/kv)；但对 cloudflare-kv-binding 会变成键前缀，
         // 导致读到 `.data/kv:member:xxx` 而非 `member:xxx` → 键不匹配。故 CF 下不加 base。
         base: process.env.NITRO_KV_DRIVER === 'cloudflare-kv-binding' ? undefined : process.env.NITRO_KV_BASE,

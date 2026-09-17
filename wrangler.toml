@@ -48,5 +48,17 @@ name = "RL_MEMBER_DOWNLOAD"
 namespace_id = "1004"
 simple = { limit = 60, period = 60 } # 会员：60 次 / 分钟（按 token）
 
+# 写入接口（素材上传、草稿增删改、群发/定时/撤回、评论操作）
+# 这些接口会真实修改公众号内容，接口层直接拒绝游客（见各写端点的 isMember 判定）
+[[ratelimits]]
+name = "RL_GUEST_PUBLISH"
+namespace_id = "1005"
+simple = { limit = 1, period = 60 } # 占位绑定；游客在接口层已被拒绝，不依赖此额度
+
+[[ratelimits]]
+name = "RL_MEMBER_PUBLISH"
+namespace_id = "1006"
+simple = { limit = 10, period = 60 } # 会员：10 次 / 分钟（按 token）
+
 # 说明：cgiData 脚本沙箱已改为主 Worker 内的 QuickJS-WASM 执行（shared/utils/cgi-sandbox.ts），
 # 不再使用 Dynamic Workers（worker_loader），因此移除了原先的 [[worker_loaders]] LOADER 绑定以停止其计费。

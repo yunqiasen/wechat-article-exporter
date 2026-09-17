@@ -7,7 +7,11 @@ export interface RequestOptions {
   endpoint: string;
   method: Method;
   query?: Record<string, string | number | undefined>;
-  body?: Record<string, string | number | undefined>;
+  /**
+   * 请求体。普通对象会编码为 application/x-www-form-urlencoded；
+   * FormData 则原样透传（multipart/form-data，用于素材上传）
+   */
+  body?: Record<string, string | number | undefined> | FormData;
   parseJson?: boolean;
   cookie?: string;
   referer?: string;

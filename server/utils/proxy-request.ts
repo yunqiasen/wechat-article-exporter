@@ -5,6 +5,12 @@ import { isDev, USER_AGENT } from '~/config';
 import { RequestOptions } from '~/server/types';
 import { cookieStore, getCookieFromStore } from '~/server/utils/CookieStore';
 import { logRequest, logResponse } from '~/server/utils/logger';
+import {
+  createMpDispatcher,
+  getLoginNetworkProfile,
+  getMpNetworkProfile,
+  persistLoginNetworkProfile,
+} from '~/server/utils/mp-network-profile';
 
 /**
  * 代理微信公众号请求
@@ -12,12 +18,19 @@ import { logRequest, logResponse } from '~/server/utils/logger';
  * @param options 请求参数
  */
 export async function proxyMpRequest(options: RequestOptions) {
-  const runtimeConfig = useRuntimeConfig();
+  const authKey = getAuthKeyFromRequest(options.event);
+  // 登录阶段尚无 authKey：使用客户端随扫码会话传来的临时配置；登录后改从 KV 按 authKey 读取。
+  const networkProfile = authKey
+    ? await getMpNetworkProfile(authKey)
+    : options.action === 'start_login' || options.action === 'login' || options.endpoint.includes('/scanloginqrcode')
+      ? await getLoginNetworkProfile(options.event)
+      : null;
 
   const headers = new Headers({
-    Referer: 'https://mp.weixin.qq.com/',
+    Referer: options.referer || 'https://mp.weixin.qq.com/',
     Origin: 'https://mp.weixin.qq.com',
-    'User-Agent': USER_AGENT,
+    'User-Agent': networkProfile?.enabled ? networkProfile.userAgent : USER_AGENT,
+    'Accept-Language': networkProfile?.enabled ? networkProfile.acceptLanguage : 'zh-CN,zh;q=0.9',
     'Accept-Encoding': 'identity', // 禁用压缩，避免出现response.clone() bug
   });
 
@@ -38,7 +51,11 @@ export async function proxyMpRequest(options: RequestOptions) {
     options.endpoint += '?' + new URLSearchParams(options.query as Record<string, string>).toString();
   }
   if (options.method === 'POST' && options.body) {
-    requestInit.body = new URLSearchParams(options.body as Record<string, string>).toString();
+    // FormData 原样透传，不设置 Content-Type，由 fetch 自动带 multipart boundary
+    requestInit.body =
+      options.body instanceof FormData
+        ? options.body
+        : new URLSearchParams(options.body as Record<string, string>).toString();
   }
 
   // 构造请求
@@ -50,8 +67,10 @@ export async function proxyMpRequest(options: RequestOptions) {
     await logRequest(requestId, request.clone());
   }
 
-  // 转发请求
-  const mpResponse = await fetch(request);
+  // 转发请求。配置了账号代理时仅在 Node/Vercel runtime 注入 undici dispatcher；
+  // 未配置的账号仍走原生 fetch，原项目行为不变。
+  const dispatcher = await createMpDispatcher(networkProfile);
+  const mpResponse = await fetch(request, dispatcher ? ({ dispatcher } as RequestInit) : undefined);
 
   // 记录响应报文
   if (process.env.NUXT_DEBUG_MP_REQUEST && isDev) {
@@ -90,6 +109,9 @@ export async function proxyMpRequest(options: RequestOptions) {
       if (!success) {
         throw new Error('cookie 写入 KV 存储失败');
       }
+
+      // 扫码阶段使用的代理/请求头必须继续绑定到这个 authKey，避免登录后突然更换出口 IP。
+      await persistLoginNetworkProfile(options.event, authKey);
       console.log('cookie 写入成功');
 
       setCookies = [
@@ -138,9 +160,18 @@ export async function proxyMpRequest(options: RequestOptions) {
 
   if (!options.parseJson) {
     return finalResponse;
-  } else {
-    return finalResponse.json();
   }
+
+  const body = await finalResponse.json();
+
+  // 仅对已有 authKey 的微信 POST 响应记录风控信号。
+  // 动态导入避免 proxy-request 与 mp-risk 形成模块循环；读取接口和登录过程不受影响。
+  if (options.method === 'POST' && getAuthKeyFromRequest(options.event)) {
+    const { afterMpWrite } = await import('~/server/utils/mp-risk');
+    await afterMpWrite(getAuthKeyFromRequest(options.event), body);
+  }
+
+  return body;
 }
 
 export function getAuthKeyFromRequest(event: H3Event): string {

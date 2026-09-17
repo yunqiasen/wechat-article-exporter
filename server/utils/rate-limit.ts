@@ -12,10 +12,13 @@ interface RateLimitEnv {
   RL_MEMBER_QUERY?: RateLimiter;
   RL_GUEST_DOWNLOAD?: RateLimiter;
   RL_MEMBER_DOWNLOAD?: RateLimiter;
+  RL_GUEST_PUBLISH?: RateLimiter;
+  RL_MEMBER_PUBLISH?: RateLimiter;
 }
 
-// 限流分组：查询类（前 3 个接口）与下载类（第 4 个接口），游客/会员限额不同。
-export type RateGroup = 'query' | 'download';
+// 限流分组：查询类、下载类、写入类（素材/草稿/发表/评论），游客/会员限额不同。
+// 写入类游客额度为 0，接口层面直接拒绝游客（见各写端点的 isMember 判定）。
+export type RateGroup = 'query' | 'download' | 'publish';
 
 // 身份判定结果：供接口做进一步的会员专属能力控制（如仅会员可导出 json/markdown/text）。
 export interface RateLimitResult {
@@ -35,6 +38,7 @@ interface GroupConfig {
 const GROUPS: Record<RateGroup, GroupConfig> = {
   query: { guestBinding: 'RL_GUEST_QUERY', memberBinding: 'RL_MEMBER_QUERY', guestLimit: 5, memberLimit: 100 },
   download: { guestBinding: 'RL_GUEST_DOWNLOAD', memberBinding: 'RL_MEMBER_DOWNLOAD', guestLimit: 1, memberLimit: 60 },
+  publish: { guestBinding: 'RL_GUEST_PUBLISH', memberBinding: 'RL_MEMBER_PUBLISH', guestLimit: 0, memberLimit: 10 },
 };
 
 /**
