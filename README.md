@@ -1,3 +1,15 @@
+# wechat-article-exporter · yunqiasen 二开版
+
+本仓库是 [wechat-article/wechat-article-exporter](https://github.com/wechat-article/wechat-article-exporter) 的个人 Fork，保留原作者署名与 MIT 许可证。
+
+- **日常开发与默认分支：** [`wechat-article-exporter-fork`](https://github.com/yunqiasen/wechat-article-exporter/tree/wechat-article-exporter-fork)。草稿、素材、发表、账号独立代理与 KV 适配等二开都在这里维护。
+- **原版镜像分支：** [`main`](https://github.com/yunqiasen/wechat-article-exporter/tree/main)，只同步上游 `master`，不放二开代码。
+- **分支约定、已有改动、上游更新评估与验证边界：** [FORK.md](./FORK.md)。
+
+> 上游已于 2026-07-30 [宣布停止维护](https://github.com/wechat-article/wechat-article-exporter/issues/200)，并报告微信历史文章列表接口关闭。自部署免费不等于历史同步或新增写接口已经验证可用；本仓库尚未完成微信账号端到端验收。下方为保留的上游说明，其中网站、商业服务和功能描述不代表本 Fork 的部署状态或实测结论。
+
+---
+
 <p align="center">
   <img src="./assets/logo.svg" alt="Logo">
 </p>
