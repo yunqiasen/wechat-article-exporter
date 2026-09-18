@@ -92,10 +92,11 @@ export default defineNuxtConfig({
 
   // https://umami.nuxt.dev/api/configuration
   umami: {
-    enabled: true,
+    // 上游默认把统计打到作者自己的域名；本 Fork 仅在显式配置环境变量时开启
+    enabled: Boolean(process.env.NUXT_UMAMI_ID && process.env.NUXT_UMAMI_HOST),
     id: process.env.NUXT_UMAMI_ID,
     host: process.env.NUXT_UMAMI_HOST,
-    domains: ['down.mptext.top'],
+    domains: process.env.NUXT_UMAMI_DOMAINS ? process.env.NUXT_UMAMI_DOMAINS.split(',') : [],
     ignoreLocalhost: true,
     autoTrack: true,
     logErrors: true,
